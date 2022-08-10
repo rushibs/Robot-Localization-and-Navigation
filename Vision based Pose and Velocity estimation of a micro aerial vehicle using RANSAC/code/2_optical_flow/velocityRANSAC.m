@@ -1,0 +1,65 @@
+function [Vel] = velocityRANSAC(optV,optPos,Z,R_c2w,e)
+%% CHANGE THE NAME OF THE FUNCTION TO velocityRANSAC
+    %% Input Parameter Description
+    % optV = The optical Flow
+    % optPos = Position of the features in the camera frame 
+    % Z = Height of the drone
+    % R_c2w = Rotation defining camera to world frame
+    %e = 0.8; %RANSAC hyper parameter
+    %% Output Parameter Description
+    % Vel = Linear velocity and angualr velocity vector
+     p_success = 0.99;
+     M = 3;
+       
+     k = log(1-p_success)/log(1-(e^M));  %probability of hitting liners
+     max_inlier = 0;
+
+     for i = 1:k
+        rnd_pose = randperm(length(optPos),3); % Random values of position
+        p1 = optPos(rnd_pose(1,1),:);
+        p2 = optPos(rnd_pose(1,2),:);
+        p3 = optPos(rnd_pose(1,3),:);
+     
+     
+        h_1 = [-1/Z 0 p1(1,1)/Z  p1(1,1)*p1(1,2) -(1+p1(1,1)^2) p1(1,2);
+                0 -1/Z p1(1,2)/Z (1+p1(1,2)^2) -p1(1,1)*p1(1,2) -p1(1,1)];
+
+        h_2 = [-1/Z 0 p2(1,1)/Z  p2(1,1)*p2(1,2) -(1+p2(1,1)^2) p2(1,2);
+           0 -1/Z p2(1,2)/Z (1+p2(1,2)^2) -p2(1,1)*p2(1,2) -p2(1,1)];
+
+        h_3 = [-1/Z 0 p3(1,1)/Z  p3(1,1)*p3(1,2) -(1+p1(1,1)^2) p3(1,2);
+                0 -1/Z p3(1,2)/Z (1+p3(1,2)^2) -p3(1,1)*p3(1,2) -p3(1,1)];
+
+        H = [h_1; h_2; h_3];
+
+        v_opt = [optV(2*rnd_pose(1,1) - 1); optV(2*rnd_pose(1,1)); optV(2*rnd_pose(1,2) - 1); 
+                optV(2*rnd_pose(1,2)); optV(2*rnd_pose(1,3) - 1); optV(2*rnd_pose(1,3))];
+
+        vel = pinv(H)*v_opt;
+
+        inlier = 0;
+
+        for j = 1: length(optPos)
+
+            H_i = [-1/Z 0 optPos(j,1)/Z  optPos(j,1)*optPos(j,2) -(1+optPos(j,1)^2) optPos(j,2);
+                 0 -1/Z optPos(j,2)/Z (1+optPos(j,2)^2) -optPos(j,1)*optPos(j,2) -optPos(j,1)];
+         
+            P_i = [optV(2*j - 1); optV(2*j)];
+
+            diff = norm(H_i*vel - P_i)^2;
+
+            if(diff<= 0.05) 
+
+                inlier = inlier +1;
+
+            end
+
+        end
+      
+        if(inlier >= max_inlier)
+
+            max_inlier = inlier;
+            Vel = vel;
+        end
+     end     
+end
